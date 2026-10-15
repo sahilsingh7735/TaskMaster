@@ -1,0 +1,19 @@
+{
+  "name": "taskmaster-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Collaborative task tracking system API",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0"
+  }
+}
