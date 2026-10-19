@@ -6,6 +6,7 @@
     "description": "Prepare the sprint backlog",
     "dueDate": "2026-10-24T18:00:00.000Z",
     "status": "completed",
-    "createdAt": "2026-10-19T18:14:15.943Z"
+    "createdAt": "2026-10-19T18:14:15.943Z",
+    "assigneeId": "be4e80b3-0bf4-450c-967e-e7ee91d178dd"
   }
 ]

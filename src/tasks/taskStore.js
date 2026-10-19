@@ -39,7 +39,7 @@ class TaskStore {
 
   async findByUserId(userId) {
     const tasks = await this.readTasks();
-    return tasks.filter((task) => task.userId === userId);
+    return tasks.filter((task) => (task.assigneeId || task.userId) === userId);
   }
 
   async markCompleted(taskId, userId) {
@@ -55,6 +55,25 @@ class TaskStore {
       tasks[taskIndex] = completedTask;
       await fs.writeFile(this.filePath, `${JSON.stringify(tasks, null, 2)}\n`, 'utf8');
       return completedTask;
+    });
+
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async assign(taskId, ownerId, assigneeId) {
+    const operation = this.writeQueue.then(async () => {
+      const tasks = await this.readTasks();
+      const taskIndex = tasks.findIndex((task) => task.id === taskId && task.userId === ownerId);
+
+      if (taskIndex === -1) {
+        return null;
+      }
+
+      const assignedTask = { ...tasks[taskIndex], assigneeId };
+      tasks[taskIndex] = assignedTask;
+      await fs.writeFile(this.filePath, `${JSON.stringify(tasks, null, 2)}\n`, 'utf8');
+      return assignedTask;
     });
 
     this.writeQueue = operation.catch(() => undefined);

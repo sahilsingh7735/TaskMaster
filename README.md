@@ -16,6 +16,7 @@ A collaborative task tracking and management system built as the Airtribe Projec
 - Task creation at `POST /api/tasks`
 - Assigned-task listing at `GET /api/tasks`
 - Task completion at `PATCH /api/tasks/:taskId/status`
+- Task assignment at `PATCH /api/tasks/:taskId/assignee`
 
 ## Run locally
 
@@ -122,6 +123,19 @@ curl -X PATCH http://localhost:3000/api/tasks/TASK_ID/status \
 
 The endpoint returns `200 OK` with the updated task. Missing or invalid tokens return `401 Unauthorized`, invalid status updates return `400 Bad Request`, and a task that does not belong to the authenticated user returns `404 Not Found`. Task editing, deletion, reassignment, and reverting completion are intentionally out of scope for this story.
 
+## Story 7: Assign a task
+
+The task owner can assign an existing task to another registered user by sending that user's ID:
+
+```bash
+curl -X PATCH http://localhost:3000/api/tasks/TASK_ID/assignee \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"assigneeId":"USER_ID"}'
+```
+
+Successful requests return `200 OK` with the unchanged task content and the new `assigneeId`. The target user must already exist, and only the task owner may assign or reassign the task. Missing or invalid tokens return `401 Unauthorized`; unknown tasks or assignees return `404 Not Found`; unsupported fields return `400 Bad Request`.
+
 ## Project structure
 
 ```text
@@ -141,7 +155,7 @@ data/
 
 `GET /api/health` confirms that the service is running. Further feature work such as tasks, projects, and collaboration should be added in separate pull requests.
 
-At this stage, account registration, login, profile viewing/updating, task creation, assigned-task listing, and task completion are implemented. Task editing/deletion, filtering, searching, reassignment, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 6.
+At this stage, account registration, login, profile viewing/updating, task creation, assigned-task listing, task completion, and task assignment are implemented. Task content editing/deletion, filtering, searching, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 7.
 
 ## Git workflow
 

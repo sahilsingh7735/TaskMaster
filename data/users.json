@@ -5,5 +5,12 @@
     "email": "asha@example.com",
     "passwordHash": "scrypt$99ce5d28492b80de0218067227f59425$8b7c3742dedd99659e8a8762c4756dbb6e01e07bd942e762d86c0bad2316e965b0ea2c721e8125252353a9f80dc22164a0d7a0e0add5b6e22046956dda8416ca",
     "createdAt": "2026-10-19T18:01:48.617Z"
+  },
+  {
+    "id": "be4e80b3-0bf4-450c-967e-e7ee91d178dd",
+    "name": "Team Member",
+    "email": "member@example.com",
+    "passwordHash": "scrypt$ecdd7f5683e58199e8beb73fec227ea2$5a5b7c523730e30308491d95ae35ce7768dfe355c43d03a28c9c0e6107b19d85be8e995855123d79ab63b773997d8debd25a3cf3a0b91c41a1ac7c8d8dcd1104",
+    "createdAt": "2026-10-19T18:44:06.136Z"
   }
 ]
