@@ -41,6 +41,25 @@ class TaskStore {
     const tasks = await this.readTasks();
     return tasks.filter((task) => task.userId === userId);
   }
+
+  async markCompleted(taskId, userId) {
+    const operation = this.writeQueue.then(async () => {
+      const tasks = await this.readTasks();
+      const taskIndex = tasks.findIndex((task) => task.id === taskId && task.userId === userId);
+
+      if (taskIndex === -1) {
+        return null;
+      }
+
+      const completedTask = { ...tasks[taskIndex], status: 'completed' };
+      tasks[taskIndex] = completedTask;
+      await fs.writeFile(this.filePath, `${JSON.stringify(tasks, null, 2)}\n`, 'utf8');
+      return completedTask;
+    });
+
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
 }
 
 module.exports = TaskStore;

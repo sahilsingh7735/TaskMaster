@@ -35,10 +35,51 @@ function validateTask(body) {
   };
 }
 
+function validateCompletion(body) {
+  const fields = Object.keys(body);
+  const errors = {};
+
+  if (fields.some((field) => field !== 'status')) {
+    errors.status = 'Only status can be updated through this endpoint';
+  } else if (body.status !== 'completed') {
+    errors.status = 'Status must be completed';
+  }
+
+  return errors;
+}
+
 router.get('/', authenticate, async (request, response, next) => {
   try {
     const tasks = await taskStore.findByUserId(request.auth.sub);
     return response.status(200).json({ tasks });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/:taskId/status', authenticate, async (request, response, next) => {
+  try {
+    const errors = validateCompletion(request.body || {});
+
+    if (Object.keys(errors).length > 0) {
+      return response.status(400).json({
+        error: 'Validation failed',
+        fields: errors
+      });
+    }
+
+    const task = await taskStore.markCompleted(request.params.taskId, request.auth.sub);
+
+    if (!task) {
+      return response.status(404).json({
+        error: 'Task not found'
+      });
+    }
+
+    return response.status(200).json({
+      message: 'Task marked as completed',
+      task
+    });
   } catch (error) {
     return next(error);
   }
