@@ -35,6 +35,15 @@ function validateTask(body) {
   };
 }
 
+router.get('/', authenticate, async (request, response, next) => {
+  try {
+    const tasks = await taskStore.findByUserId(request.auth.sub);
+    return response.status(200).json({ tasks });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/', authenticate, async (request, response, next) => {
   try {
     const { errors, task: taskInput } = validateTask(request.body || {});

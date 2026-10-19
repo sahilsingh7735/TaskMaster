@@ -36,6 +36,11 @@ class TaskStore {
     this.writeQueue = operation.catch(() => undefined);
     return operation;
   }
+
+  async findByUserId(userId) {
+    const tasks = await this.readTasks();
+    return tasks.filter((task) => task.userId === userId);
+  }
 }
 
 module.exports = TaskStore;

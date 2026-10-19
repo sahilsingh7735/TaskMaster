@@ -14,6 +14,7 @@ A collaborative task tracking and management system built as the Airtribe Projec
 - Profile viewing at `GET /api/users/me`
 - Profile updates at `PATCH /api/users/me`
 - Task creation at `POST /api/tasks`
+- Assigned-task listing at `GET /api/tasks`
 
 ## Run locally
 
@@ -96,6 +97,17 @@ curl -X POST http://localhost:3000/api/tasks \
 
 Successful requests return `201 Created` with the task's server-generated `id`, authenticated `userId`, normalized title/description/due date, `status: "open"`, and `createdAt`. Missing or invalid fields return `400 Bad Request`; missing or invalid tokens return `401 Unauthorized`. Task editing, deletion, listing, filtering, searching, assignment, and collaboration are intentionally not implemented yet.
 
+## Story 5: View assigned tasks
+
+Retrieve the tasks owned by the authenticated user with:
+
+```bash
+curl http://localhost:3000/api/tasks \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+The endpoint returns `200 OK` with a `tasks` array containing only records whose server-owned `userId` matches the token subject. An account with no assigned tasks receives an empty array. Missing or invalid tokens return `401 Unauthorized`; filtering, sorting, searching, and task changes are intentionally out of scope for this story.
+
 ## Project structure
 
 ```text
@@ -103,7 +115,7 @@ src/
   app.js       Express application and middleware
   server.js    Environment loading and HTTP server startup
   middleware/  JWT authentication middleware
-  routes/      HTTP routes for auth, profiles, and task creation
+  routes/      HTTP routes for auth, profiles, and task operations
   tasks/       Task persistence
   users/       User persistence, password verification, and public views
 data/
@@ -115,7 +127,7 @@ data/
 
 `GET /api/health` confirms that the service is running. Further feature work such as tasks, projects, and collaboration should be added in separate pull requests.
 
-At this stage, account registration, login, profile viewing/updating, and task creation are implemented. Task editing/deletion, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 4.
+At this stage, account registration, login, profile viewing/updating, task creation, and assigned-task listing are implemented. Task editing/deletion, filtering, searching, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 5.
 
 ## Git workflow
 
