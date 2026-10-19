@@ -305,3 +305,33 @@ test('rejects incomplete or invalid task data', async () => {
   assert.equal(result.status, 400);
   assert.deepEqual(Object.keys(result.body.fields).sort(), ['description', 'dueDate', 'title']);
 });
+
+test('requires authentication to view assigned tasks', async () => {
+  const result = await taskRequest('GET');
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: 'Authentication required' });
+});
+
+test('returns only tasks assigned to the authenticated user', async () => {
+  const firstToken = await createAuthenticatedUser('assigned-first@example.com', 'Assigned First');
+  const secondToken = await createAuthenticatedUser('assigned-second@example.com', 'Assigned Second');
+
+  const firstTask = await taskRequest('POST', firstToken, {
+    title: 'First user task',
+    description: 'Visible to the first user',
+    dueDate: '2026-10-25T18:00:00.000Z'
+  });
+  await taskRequest('POST', secondToken, {
+    title: 'Second user task',
+    description: 'Visible to the second user',
+    dueDate: '2026-10-26T18:00:00.000Z'
+  });
+
+  const result = await taskRequest('GET', firstToken);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.tasks.length, 1);
+  assert.equal(result.body.tasks[0].id, firstTask.body.task.id);
+  assert.equal(result.body.tasks[0].title, 'First user task');
+});
