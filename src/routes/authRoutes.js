@@ -1,18 +1,15 @@
 const crypto = require('node:crypto');
 const express = require('express');
+const jwt = require('jsonwebtoken');
+const { hashPassword, verifyPassword } = require('../users/password');
 const UserStore = require('../users/userStore');
 
 const router = express.Router();
 const userStore = new UserStore();
+const dummyPasswordHash = hashPassword('invalid-login-password');
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
-}
-
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = crypto.scryptSync(password, salt, 64).toString('hex');
-  return `scrypt$${salt}$${derivedKey}`;
 }
 
 function validateRegistration(body) {
@@ -34,6 +31,31 @@ function validateRegistration(body) {
   }
 
   return { errors, name, email, password };
+}
+
+function validateLogin(body) {
+  const errors = {};
+  const email = typeof body.email === 'string' ? normalizeEmail(body.email) : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    errors.email = 'A valid email address is required';
+  }
+
+  if (password.length < 1 || password.length > 128) {
+    errors.password = 'Password is required';
+  }
+
+  return { errors, email, password };
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt
+  };
 }
 
 router.post('/register', async (request, response, next) => {
@@ -69,12 +91,52 @@ router.post('/register', async (request, response, next) => {
 
     return response.status(201).json({
       message: 'Account created successfully',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        createdAt: user.createdAt
-      }
+      user: publicUser(user)
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/login', async (request, response, next) => {
+  try {
+    const { errors, email, password } = validateLogin(request.body || {});
+
+    if (Object.keys(errors).length > 0) {
+      return response.status(400).json({
+        error: 'Validation failed',
+        fields: errors
+      });
+    }
+
+    const user = await userStore.findByEmail(email);
+
+    const passwordHash = user ? user.passwordHash : dummyPasswordHash;
+
+    if (!verifyPassword(password, passwordHash)) {
+      return response.status(401).json({
+        error: 'Invalid email or password'
+      });
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
+
+    const accessToken = jwt.sign(
+      { sub: user.id, type: 'access' },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    return response.status(200).json({
+      message: 'Login successful',
+      tokenType: 'Bearer',
+      expiresIn: 3600,
+      accessToken,
+      user: publicUser(user)
     });
   } catch (error) {
     return next(error);
