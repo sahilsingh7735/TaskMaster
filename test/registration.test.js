@@ -8,6 +8,7 @@ const test = require('node:test');
 
 const testDirectory = fsSync.mkdtempSync(path.join(os.tmpdir(), 'taskmaster-'));
 process.env.TASKMASTER_USERS_FILE = path.join(testDirectory, 'users.json');
+process.env.TASKMASTER_TASKS_FILE = path.join(testDirectory, 'tasks.json');
 process.env.JWT_SECRET = 'test-only-jwt-secret-that-is-long-enough';
 
 const app = require('../src/app');
@@ -93,6 +94,31 @@ async function createAuthenticatedUser(email, name) {
   await register({ name, email, password: 'profile test password' });
   const result = await login({ email, password: 'profile test password' });
   return result.body.accessToken;
+}
+
+async function taskRequest(method, token, payload) {
+  const address = server.address();
+  const options = {
+    method,
+    headers: {
+      'content-type': 'application/json'
+    }
+  };
+
+  if (token) {
+    options.headers.authorization = `Bearer ${token}`;
+  }
+
+  if (payload) {
+    options.body = JSON.stringify(payload);
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/tasks`, options);
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
 }
 
 test('creates an account and never returns the password hash', async () => {
@@ -232,4 +258,50 @@ test('rejects unsupported profile fields', async () => {
 
   assert.equal(result.status, 400);
   assert.equal(result.body.fields.profile, 'Only name and email can be updated');
+});
+
+test('requires authentication to create a task', async () => {
+  const result = await taskRequest('POST', undefined, {
+    title: 'Plan sprint',
+    description: 'Prepare the sprint backlog',
+    dueDate: '2026-10-24T18:00:00.000Z'
+  });
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: 'Authentication required' });
+});
+
+test('creates a task with server-owned fields', async () => {
+  const token = await createAuthenticatedUser('task-create@example.com', 'Task Creator');
+  const result = await taskRequest('POST', token, {
+    title: 'Plan sprint',
+    description: 'Prepare the sprint backlog',
+    dueDate: '2026-10-24T18:00:00.000Z'
+  });
+
+  assert.equal(result.status, 201);
+  assert.equal(result.body.message, 'Task created successfully');
+  assert.equal(result.body.task.title, 'Plan sprint');
+  assert.equal(result.body.task.description, 'Prepare the sprint backlog');
+  assert.equal(result.body.task.dueDate, '2026-10-24T18:00:00.000Z');
+  assert.equal(result.body.task.status, 'open');
+  assert.ok(result.body.task.id);
+  assert.ok(result.body.task.userId);
+  assert.ok(result.body.task.createdAt);
+
+  const storedTasks = JSON.parse(await fs.readFile(process.env.TASKMASTER_TASKS_FILE, 'utf8'));
+  assert.equal(storedTasks.length, 1);
+  assert.equal(storedTasks[0].userId, result.body.task.userId);
+});
+
+test('rejects incomplete or invalid task data', async () => {
+  const token = await createAuthenticatedUser('task-validation@example.com', 'Task Validation');
+  const result = await taskRequest('POST', token, {
+    title: ' ',
+    description: '',
+    dueDate: 'not-a-date'
+  });
+
+  assert.equal(result.status, 400);
+  assert.deepEqual(Object.keys(result.body.fields).sort(), ['description', 'dueDate', 'title']);
 });

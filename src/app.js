@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 const app = express();
 
@@ -8,6 +9,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', profileRoutes);
+app.use('/api/tasks', taskRoutes);
 
 app.get('/api/health', (_request, response) => {
   response.status(200).json({
