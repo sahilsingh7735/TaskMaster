@@ -15,6 +15,7 @@ A collaborative task tracking and management system built as the Airtribe Projec
 - Profile updates at `PATCH /api/users/me`
 - Task creation at `POST /api/tasks`
 - Assigned-task listing at `GET /api/tasks`
+- Task completion at `PATCH /api/tasks/:taskId/status`
 
 ## Run locally
 
@@ -108,6 +109,19 @@ curl http://localhost:3000/api/tasks \
 
 The endpoint returns `200 OK` with a `tasks` array containing only records whose server-owned `userId` matches the token subject. An account with no assigned tasks receives an empty array. Missing or invalid tokens return `401 Unauthorized`; filtering, sorting, searching, and task changes are intentionally out of scope for this story.
 
+## Story 6: Mark a task as completed
+
+Mark one of the authenticated user's tasks as completed with:
+
+```bash
+curl -X PATCH http://localhost:3000/api/tasks/TASK_ID/status \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"completed"}'
+```
+
+The endpoint returns `200 OK` with the updated task. Missing or invalid tokens return `401 Unauthorized`, invalid status updates return `400 Bad Request`, and a task that does not belong to the authenticated user returns `404 Not Found`. Task editing, deletion, reassignment, and reverting completion are intentionally out of scope for this story.
+
 ## Project structure
 
 ```text
@@ -127,7 +141,7 @@ data/
 
 `GET /api/health` confirms that the service is running. Further feature work such as tasks, projects, and collaboration should be added in separate pull requests.
 
-At this stage, account registration, login, profile viewing/updating, task creation, and assigned-task listing are implemented. Task editing/deletion, filtering, searching, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 5.
+At this stage, account registration, login, profile viewing/updating, task creation, assigned-task listing, and task completion are implemented. Task editing/deletion, filtering, searching, reassignment, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 6.
 
 ## Git workflow
 

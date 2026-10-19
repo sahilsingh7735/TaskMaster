@@ -121,6 +121,28 @@ async function taskRequest(method, token, payload) {
   };
 }
 
+async function completeTask(token, taskId, payload = { status: 'completed' }) {
+  const address = server.address();
+  const options = {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  };
+
+  if (token) {
+    options.headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/tasks/${taskId}/status`, options);
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
 test('creates an account and never returns the password hash', async () => {
   const result = await register({
     name: 'Asha Kumar',
@@ -334,4 +356,53 @@ test('returns only tasks assigned to the authenticated user', async () => {
   assert.equal(result.body.tasks.length, 1);
   assert.equal(result.body.tasks[0].id, firstTask.body.task.id);
   assert.equal(result.body.tasks[0].title, 'First user task');
+});
+
+test('requires authentication to mark a task as completed', async () => {
+  const result = await completeTask(undefined, 'missing-task');
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: 'Authentication required' });
+});
+
+test('marks an owned task as completed and persists the status', async () => {
+  const token = await createAuthenticatedUser('completion-owner@example.com', 'Completion Owner');
+  const created = await taskRequest('POST', token, {
+    title: 'Finish report',
+    description: 'Complete the final report',
+    dueDate: '2026-10-27T18:00:00.000Z'
+  });
+
+  const result = await completeTask(token, created.body.task.id);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, 'Task marked as completed');
+  assert.equal(result.body.task.status, 'completed');
+
+  const storedTasks = JSON.parse(await fs.readFile(process.env.TASKMASTER_TASKS_FILE, 'utf8'));
+  const storedTask = storedTasks.find((task) => task.id === created.body.task.id);
+  assert.equal(storedTask.status, 'completed');
+});
+
+test('does not allow another user to complete a task', async () => {
+  const ownerToken = await createAuthenticatedUser('completion-owner-two@example.com', 'Completion Owner Two');
+  const otherToken = await createAuthenticatedUser('completion-other@example.com', 'Completion Other');
+  const created = await taskRequest('POST', ownerToken, {
+    title: 'Owner task',
+    description: 'Only the owner can complete this',
+    dueDate: '2026-10-28T18:00:00.000Z'
+  });
+
+  const result = await completeTask(otherToken, created.body.task.id);
+
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, { error: 'Task not found' });
+});
+
+test('rejects unsupported task status updates', async () => {
+  const token = await createAuthenticatedUser('completion-validation@example.com', 'Completion Validation');
+  const result = await completeTask(token, 'missing-task', { status: 'open' });
+
+  assert.equal(result.status, 400);
+  assert.equal(result.body.fields.status, 'Status must be completed');
 });
