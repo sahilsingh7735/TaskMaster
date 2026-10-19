@@ -13,6 +13,7 @@ A collaborative task tracking and management system built as the Airtribe Projec
 - Secure login at `POST /api/auth/login`
 - Profile viewing at `GET /api/users/me`
 - Profile updates at `PATCH /api/users/me`
+- Task creation at `POST /api/tasks`
 
 ## Run locally
 
@@ -82,6 +83,19 @@ curl -X PATCH http://localhost:3000/api/users/me \
 
 Successful requests return the public `id`, `name`, `email`, and `createdAt` fields. Passwords cannot be changed through the profile endpoint and password hashes are never returned. Missing, expired, or invalid tokens return `401 Unauthorized`; invalid profile data returns `400 Bad Request`; an email already in use returns `409 Conflict`.
 
+## Story 4: Create a task
+
+Task creation requires a Bearer token and accepts `title`, `description`, and an ISO 8601 `dueDate`:
+
+```bash
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Plan sprint","description":"Prepare the sprint backlog","dueDate":"2026-10-24T18:00:00.000Z"}'
+```
+
+Successful requests return `201 Created` with the task's server-generated `id`, authenticated `userId`, normalized title/description/due date, `status: "open"`, and `createdAt`. Missing or invalid fields return `400 Bad Request`; missing or invalid tokens return `401 Unauthorized`. Task editing, deletion, listing, filtering, searching, assignment, and collaboration are intentionally not implemented yet.
+
 ## Project structure
 
 ```text
@@ -89,17 +103,19 @@ src/
   app.js       Express application and middleware
   server.js    Environment loading and HTTP server startup
   middleware/  JWT authentication middleware
-  routes/      HTTP routes for registration, login, and profiles
+  routes/      HTTP routes for auth, profiles, and task creation
+  tasks/       Task persistence
   users/       User persistence, password verification, and public views
 data/
   users.json   Local user records for development
+  tasks.json   Local task records for development
 ```
 
 ## Initial endpoints
 
 `GET /api/health` confirms that the service is running. Further feature work such as tasks, projects, and collaboration should be added in separate pull requests.
 
-At this stage, account registration, login, and profile viewing/updating are implemented. Tasks, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 3.
+At this stage, account registration, login, profile viewing/updating, and task creation are implemented. Task editing/deletion, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 4.
 
 ## Git workflow
 
