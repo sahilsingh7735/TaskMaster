@@ -64,6 +64,37 @@ async function loginWithRawBody(body) {
   };
 }
 
+async function profileRequest(method, token, payload) {
+  const address = server.address();
+  const options = {
+    method,
+    headers: {
+      'content-type': 'application/json'
+    }
+  };
+
+  if (token) {
+    options.headers.authorization = `Bearer ${token}`;
+  }
+
+  if (payload) {
+    options.body = JSON.stringify(payload);
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/users/me`, options);
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
+async function createAuthenticatedUser(email, name) {
+  await register({ name, email, password: 'profile test password' });
+  const result = await login({ email, password: 'profile test password' });
+  return result.body.accessToken;
+}
+
 test('creates an account and never returns the password hash', async () => {
   const result = await register({
     name: 'Asha Kumar',
@@ -150,4 +181,55 @@ test('rejects malformed JSON request bodies', async () => {
 
   assert.equal(result.status, 400);
   assert.deepEqual(result.body, { error: 'Invalid JSON request body' });
+});
+
+test('requires authentication to view a profile', async () => {
+  const result = await profileRequest('GET');
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: 'Authentication required' });
+});
+
+test('returns the authenticated user profile without sensitive fields', async () => {
+  const token = await createAuthenticatedUser('profile-view@example.com', 'Profile Viewer');
+  const result = await profileRequest('GET', token);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.user.name, 'Profile Viewer');
+  assert.equal(result.body.user.email, 'profile-view@example.com');
+  assert.ok(result.body.user.id);
+  assert.ok(result.body.user.createdAt);
+  assert.equal('passwordHash' in result.body.user, false);
+});
+
+test('updates profile fields while preserving the password hash', async () => {
+  const email = 'profile-update@example.com';
+  const token = await createAuthenticatedUser(email, 'Before Update');
+  const before = JSON.parse(await fs.readFile(process.env.TASKMASTER_USERS_FILE, 'utf8'))
+    .find((user) => user.email === email);
+
+  const update = await profileRequest('PATCH', token, {
+    name: 'After Update',
+    email: 'profile-updated@example.com'
+  });
+
+  assert.equal(update.status, 200);
+  assert.equal(update.body.message, 'Profile updated successfully');
+  assert.equal(update.body.user.name, 'After Update');
+  assert.equal(update.body.user.email, 'profile-updated@example.com');
+  assert.equal('passwordHash' in update.body.user, false);
+
+  const after = JSON.parse(await fs.readFile(process.env.TASKMASTER_USERS_FILE, 'utf8'))
+    .find((user) => user.id === before.id);
+  assert.equal(after.passwordHash, before.passwordHash);
+});
+
+test('rejects unsupported profile fields', async () => {
+  const token = await createAuthenticatedUser('profile-validation@example.com', 'Profile Validation');
+  const result = await profileRequest('PATCH', token, {
+    password: 'new password'
+  });
+
+  assert.equal(result.status, 400);
+  assert.equal(result.body.fields.profile, 'Only name and email can be updated');
 });

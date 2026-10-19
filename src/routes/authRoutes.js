@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { hashPassword, verifyPassword } = require('../users/password');
+const publicUser = require('../users/publicUser');
 const UserStore = require('../users/userStore');
 
 const router = express.Router();
@@ -47,15 +48,6 @@ function validateLogin(body) {
   }
 
   return { errors, email, password };
-}
-
-function publicUser(user) {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    createdAt: user.createdAt
-  };
 }
 
 router.post('/register', async (request, response, next) => {

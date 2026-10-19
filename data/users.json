@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "d6ab72aa-bdb9-4678-b864-c664df303335",
+    "name": "Asha Kumar",
+    "email": "asha@example.com",
+    "passwordHash": "scrypt$99ce5d28492b80de0218067227f59425$8b7c3742dedd99659e8a8762c4756dbb6e01e07bd942e762d86c0bad2316e965b0ea2c721e8125252353a9f80dc22164a0d7a0e0add5b6e22046956dda8416ca",
+    "createdAt": "2026-10-19T18:01:48.617Z"
+  }
+]

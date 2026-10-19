@@ -11,6 +11,8 @@ A collaborative task tracking and management system built as the Airtribe Projec
 - Health endpoint at `GET /api/health`
 - Account creation at `POST /api/auth/register`
 - Secure login at `POST /api/auth/login`
+- Profile viewing at `GET /api/users/me`
+- Profile updates at `PATCH /api/users/me`
 
 ## Run locally
 
@@ -60,23 +62,44 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 Successful requests return `200 OK` with a signed Bearer access token that expires after one hour and the public user fields. Invalid credentials return the same `401 Unauthorized` response whether the email or password is incorrect, preventing account enumeration. Missing or malformed fields return `400 Bad Request`.
 
+## Story 3: View and update a profile
+
+Profile endpoints require the Bearer token returned by login. View the current user's public profile with:
+
+```bash
+curl http://localhost:3000/api/users/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Update the user's name and/or email with:
+
+```bash
+curl -X PATCH http://localhost:3000/api/users/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Asha Singh","email":"asha.singh@example.com"}'
+```
+
+Successful requests return the public `id`, `name`, `email`, and `createdAt` fields. Passwords cannot be changed through the profile endpoint and password hashes are never returned. Missing, expired, or invalid tokens return `401 Unauthorized`; invalid profile data returns `400 Bad Request`; an email already in use returns `409 Conflict`.
+
 ## Project structure
 
 ```text
 src/
   app.js       Express application and middleware
   server.js    Environment loading and HTTP server startup
-  routes/      HTTP routes, including registration and login
-  users/       User persistence and password verification
+  middleware/  JWT authentication middleware
+  routes/      HTTP routes for registration, login, and profiles
+  users/       User persistence, password verification, and public views
 data/
   users.json   Local user records for development
 ```
 
 ## Initial endpoints
 
-`GET /api/health` confirms that the service is running. Feature work such as authentication, database integration, projects, tasks, and collaboration should be added in separate pull requests.
+`GET /api/health` confirms that the service is running. Further feature work such as tasks, projects, and collaboration should be added in separate pull requests.
 
-At this stage, `POST /api/auth/register` and `POST /api/auth/login` are the only account features implemented. Profiles, tasks, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 and 2.
+At this stage, account registration, login, and profile viewing/updating are implemented. Tasks, projects, comments, attachments, notifications, and AI features are intentionally out of scope for Stories 1 to 3.
 
 ## Git workflow
 

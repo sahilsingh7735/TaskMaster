@@ -46,6 +46,34 @@ class UserStore {
     const users = await this.readUsers();
     return users.find((user) => user.email === email) || null;
   }
+
+  async findById(id) {
+    const users = await this.readUsers();
+    return users.find((user) => user.id === id) || null;
+  }
+
+  async updateById(id, updates) {
+    const operation = this.writeQueue.then(async () => {
+      const users = await this.readUsers();
+      const userIndex = users.findIndex((user) => user.id === id);
+
+      if (userIndex === -1) {
+        return 'not_found';
+      }
+
+      if (updates.email && users.some((user) => user.id !== id && user.email === updates.email)) {
+        return 'email_taken';
+      }
+
+      const updatedUser = { ...users[userIndex], ...updates };
+      users[userIndex] = updatedUser;
+      await fs.writeFile(this.filePath, `${JSON.stringify(users, null, 2)}\n`, 'utf8');
+      return updatedUser;
+    });
+
+    this.writeQueue = operation.catch(() => undefined);
+    return operation;
+  }
 }
 
 module.exports = UserStore;
