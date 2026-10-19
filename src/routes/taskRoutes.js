@@ -2,9 +2,11 @@ const crypto = require('node:crypto');
 const express = require('express');
 const authenticate = require('../middleware/authenticate');
 const TaskStore = require('../tasks/taskStore');
+const UserStore = require('../users/userStore');
 
 const router = express.Router();
 const taskStore = new TaskStore();
+const userStore = new UserStore();
 
 function validateTask(body) {
   const errors = {};
@@ -48,6 +50,19 @@ function validateCompletion(body) {
   return errors;
 }
 
+function validateAssignment(body) {
+  const errors = {};
+  const fields = Object.keys(body);
+
+  if (fields.length !== 1 || fields[0] !== 'assigneeId') {
+    errors.assigneeId = 'Only assigneeId can be updated through this endpoint';
+  } else if (typeof body.assigneeId !== 'string' || body.assigneeId.trim().length === 0) {
+    errors.assigneeId = 'A valid assigneeId is required';
+  }
+
+  return errors;
+}
+
 router.get('/', authenticate, async (request, response, next) => {
   try {
     const tasks = await taskStore.findByUserId(request.auth.sub);
@@ -85,6 +100,43 @@ router.patch('/:taskId/status', authenticate, async (request, response, next) =>
   }
 });
 
+router.patch('/:taskId/assignee', authenticate, async (request, response, next) => {
+  try {
+    const errors = validateAssignment(request.body || {});
+
+    if (Object.keys(errors).length > 0) {
+      return response.status(400).json({
+        error: 'Validation failed',
+        fields: errors
+      });
+    }
+
+    const assigneeId = request.body.assigneeId.trim();
+    const assignee = await userStore.findById(assigneeId);
+
+    if (!assignee) {
+      return response.status(404).json({
+        error: 'Assignee not found'
+      });
+    }
+
+    const task = await taskStore.assign(request.params.taskId, request.auth.sub, assigneeId);
+
+    if (!task) {
+      return response.status(404).json({
+        error: 'Task not found'
+      });
+    }
+
+    return response.status(200).json({
+      message: 'Task assigned successfully',
+      task
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/', authenticate, async (request, response, next) => {
   try {
     const { errors, task: taskInput } = validateTask(request.body || {});
@@ -99,6 +151,7 @@ router.post('/', authenticate, async (request, response, next) => {
     const task = await taskStore.create({
       id: crypto.randomUUID(),
       userId: request.auth.sub,
+      assigneeId: request.auth.sub,
       ...taskInput,
       status: 'open',
       createdAt: new Date().toISOString()

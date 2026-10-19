@@ -143,6 +143,37 @@ async function completeTask(token, taskId, payload = { status: 'completed' }) {
   };
 }
 
+async function assignTask(token, taskId, assigneeId) {
+  const address = server.address();
+  const options = {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ assigneeId })
+  };
+
+  if (token) {
+    options.headers.authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/tasks/${taskId}/assignee`, options);
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
+async function createAuthenticatedUserDetails(email, name) {
+  const registration = await register({ name, email, password: 'assignment test password' });
+  const loginResult = await login({ email, password: 'assignment test password' });
+  return {
+    id: registration.body.user.id,
+    token: loginResult.body.accessToken
+  };
+}
+
 test('creates an account and never returns the password hash', async () => {
   const result = await register({
     name: 'Asha Kumar',
@@ -405,4 +436,75 @@ test('rejects unsupported task status updates', async () => {
 
   assert.equal(result.status, 400);
   assert.equal(result.body.fields.status, 'Status must be completed');
+});
+
+test('requires authentication to assign a task', async () => {
+  const result = await assignTask(undefined, 'missing-task', 'missing-user');
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: 'Authentication required' });
+});
+
+test('assigns an owned task to another registered user', async () => {
+  const owner = await createAuthenticatedUserDetails('assignment-owner@example.com', 'Assignment Owner');
+  const assignee = await createAuthenticatedUserDetails('assignment-member@example.com', 'Assignment Member');
+  const created = await taskRequest('POST', owner.token, {
+    title: 'Review proposal',
+    description: 'Ask another team member to review the proposal',
+    dueDate: '2026-10-29T18:00:00.000Z'
+  });
+
+  const result = await assignTask(owner.token, created.body.task.id, assignee.id);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, 'Task assigned successfully');
+  assert.equal(result.body.task.userId, owner.id);
+  assert.equal(result.body.task.assigneeId, assignee.id);
+  assert.equal(result.body.task.title, 'Review proposal');
+
+  const storedTasks = JSON.parse(await fs.readFile(process.env.TASKMASTER_TASKS_FILE, 'utf8'));
+  const storedTask = storedTasks.find((task) => task.id === created.body.task.id);
+  assert.equal(storedTask.assigneeId, assignee.id);
+});
+
+test('does not allow another user to assign the task', async () => {
+  const owner = await createAuthenticatedUserDetails('assignment-owner-two@example.com', 'Assignment Owner Two');
+  const otherUser = await createAuthenticatedUserDetails('assignment-other@example.com', 'Assignment Other');
+  const assignee = await createAuthenticatedUserDetails('assignment-member-two@example.com', 'Assignment Member Two');
+  const created = await taskRequest('POST', owner.token, {
+    title: 'Owner-controlled task',
+    description: 'Only the owner may reassign this task',
+    dueDate: '2026-10-30T18:00:00.000Z'
+  });
+
+  const result = await assignTask(otherUser.token, created.body.task.id, assignee.id);
+
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, { error: 'Task not found' });
+});
+
+test('rejects unknown assignees and unsupported assignment fields', async () => {
+  const owner = await createAuthenticatedUserDetails('assignment-validation@example.com', 'Assignment Validation');
+  const created = await taskRequest('POST', owner.token, {
+    title: 'Validate assignment',
+    description: 'Validate assignment input',
+    dueDate: '2026-10-31T18:00:00.000Z'
+  });
+
+  const unknownAssignee = await assignTask(owner.token, created.body.task.id, 'missing-user');
+  assert.equal(unknownAssignee.status, 404);
+  assert.deepEqual(unknownAssignee.body, { error: 'Assignee not found' });
+
+  const invalidPayload = await fetch(`http://127.0.0.1:${server.address().port}/api/tasks/${created.body.task.id}/assignee`, {
+    method: 'PATCH',
+    headers: {
+      authorization: `Bearer ${owner.token}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ assigneeId: 'missing-user', title: 'not allowed' })
+  });
+
+  assert.equal(invalidPayload.status, 400);
+  const invalidBody = await invalidPayload.json();
+  assert.equal(invalidBody.fields.assigneeId, 'Only assigneeId can be updated through this endpoint');
 });
