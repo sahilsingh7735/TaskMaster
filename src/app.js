@@ -15,6 +15,12 @@ app.get('/api/health', (_request, response) => {
 });
 
 app.use((error, _request, response, _next) => {
+  if (error.type === 'entity.parse.failed') {
+    return response.status(400).json({
+      error: 'Invalid JSON request body'
+    });
+  }
+
   console.error(error);
   response.status(500).json({
     error: 'Internal server error'

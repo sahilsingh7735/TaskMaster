@@ -8,6 +8,7 @@ const test = require('node:test');
 
 const testDirectory = fsSync.mkdtempSync(path.join(os.tmpdir(), 'taskmaster-'));
 process.env.TASKMASTER_USERS_FILE = path.join(testDirectory, 'users.json');
+process.env.JWT_SECRET = 'test-only-jwt-secret-that-is-long-enough';
 
 const app = require('../src/app');
 const server = http.createServer(app);
@@ -27,6 +28,34 @@ async function register(payload) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload)
+  });
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
+async function login(payload) {
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  return {
+    status: response.status,
+    body: await response.json()
+  };
+}
+
+async function loginWithRawBody(body) {
+  const address = server.address();
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body
   });
 
   return {
@@ -76,4 +105,49 @@ test('rejects invalid registration data', async () => {
 
   assert.equal(result.status, 400);
   assert.deepEqual(Object.keys(result.body.fields).sort(), ['email', 'name', 'password']);
+});
+
+test('logs in with valid credentials and returns a bearer access token', async () => {
+  const result = await login({
+    email: 'ASHA@example.com',
+    password: 'correct horse battery staple'
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.message, 'Login successful');
+  assert.equal(result.body.tokenType, 'Bearer');
+  assert.equal(result.body.expiresIn, 3600);
+  assert.ok(result.body.accessToken);
+  assert.equal(result.body.user.email, 'asha@example.com');
+  assert.equal('passwordHash' in result.body.user, false);
+});
+
+test('rejects incorrect credentials without revealing which value is wrong', async () => {
+  const wrongPassword = await login({
+    email: 'asha@example.com',
+    password: 'wrong password'
+  });
+  const unknownEmail = await login({
+    email: 'missing@example.com',
+    password: 'wrong password'
+  });
+
+  assert.equal(wrongPassword.status, 401);
+  assert.deepEqual(wrongPassword.body, { error: 'Invalid email or password' });
+  assert.equal(unknownEmail.status, 401);
+  assert.deepEqual(unknownEmail.body, { error: 'Invalid email or password' });
+});
+
+test('rejects incomplete login data', async () => {
+  const result = await login({ email: 'not-an-email' });
+
+  assert.equal(result.status, 400);
+  assert.deepEqual(Object.keys(result.body.fields).sort(), ['email', 'password']);
+});
+
+test('rejects malformed JSON request bodies', async () => {
+  const result = await loginWithRawBody('{"email":');
+
+  assert.equal(result.status, 400);
+  assert.deepEqual(result.body, { error: 'Invalid JSON request body' });
 });
